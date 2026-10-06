@@ -1131,6 +1131,8 @@
 #btn-datos-ciudadano[hidden],
 #btn-direccion-lista[hidden] { display: none; }
 #fallback-geo[hidden] { display: none; }
+.dir-campo { text-transform: uppercase; }
+.dir-ayuda { font-size: .85em; opacity: .8; margin: .25rem 0 0; }
 .datos-aviso { min-height: 1.1em; margin: 0; font-size: 0.78rem; color: #9f1239; }
 .datos-competencia {
   margin: 0;
@@ -1785,15 +1787,16 @@
                   </select>
                 </label>
                 <label class="datos-label" for="dir-n1">Número
-                  <input id="dir-n1" inputmode="numeric" maxlength="4" placeholder="5" oninput="this.value=this.value.replace(/\D/g,'');pintarVistaDireccion()">
+                  <input id="dir-n1" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="2A" class="dir-campo" oninput="pintarVistaDireccion()">
                 </label>
                 <label class="datos-label" for="dir-n2">Número
-                  <input id="dir-n2" inputmode="numeric" maxlength="4" placeholder="8" oninput="this.value=this.value.replace(/\D/g,'');pintarVistaDireccion()">
+                  <input id="dir-n2" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="6 BIS" class="dir-campo" oninput="pintarVistaDireccion()">
                 </label>
                 <label class="datos-label" for="dir-n3">Placa
-                  <input id="dir-n3" inputmode="numeric" maxlength="4" placeholder="21" oninput="this.value=this.value.replace(/\D/g,'');pintarVistaDireccion()">
+                  <input id="dir-n3" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="38 SUR" class="dir-campo" oninput="pintarVistaDireccion()">
                 </label>
               </div>
+              <p class="dir-ayuda">Puedes escribir letras y complementos, por ejemplo 2A, 6 BIS o 38 SUR.</p>
               <p class="datos-aviso" id="dir-vista"></p>
               <button type="button" class="btn btn-lime" id="btn-direccion-lista" onclick="confirmarDireccionIngresada()">Continuar</button>
               <fieldset class="datos-rosal" id="pregunta-rosal" hidden>
@@ -1804,11 +1807,11 @@
               <div id="fallback-geo" hidden>
                 <fieldset class="datos-rosal">
                   <legend>No se ubicó la dirección. ¿El sector es urbano o rural?</legend>
-                  <label><input type="radio" name="sector" value="URBANO"> Urbano</label>
-                  <label><input type="radio" name="sector" value="RURAL"> Rural</label>
+                  <label><input type="radio" name="sector" value="URBANO" onchange="cambioSector()"> Urbano</label>
+                  <label><input type="radio" name="sector" value="RURAL" onchange="cambioSector()"> Rural</label>
                 </fieldset>
-                <label class="datos-label" for="campo-barrio">Barrio o vereda
-                  <input id="campo-barrio" type="text" oninput="this.value=this.value.toUpperCase()">
+                <label class="datos-label" for="campo-barrio"><span id="label-barrio">Barrio o vereda</span>
+                  <input id="campo-barrio" type="text" autocapitalize="characters" autocomplete="off" class="dir-campo" placeholder="Ej: CENTRO o VEREDA EL ROBLE">
                 </label>
                 <button type="button" class="btn btn-lime" onclick="confirmarSinGeolocalizacion()">Guardar dirección</button>
               </div>
@@ -2196,6 +2199,24 @@ function filtrarEntradaChat(inp) {
   else if (campo === 'telefono') inp.value = telefonoDigitos(inp.value);
 }
 
+function parteDireccion(valor) {
+  const t = String(valor || '').toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^0-9A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return /^\d/.test(t) ? t : '';
+}
+
+function cambioSector() {
+  const s = document.querySelector('#fallback-geo input[name="sector"]:checked');
+  const label = document.getElementById('label-barrio');
+  const campo = document.getElementById('campo-barrio');
+  if (label) label.textContent = s && s.value === 'RURAL' ? 'Vereda' : 'Barrio';
+  if (campo) {
+    campo.placeholder = s && s.value === 'RURAL' ? 'Ej: VEREDA EL ROBLE' : 'Ej: CENTRO';
+    campo.focus();
+  }
+}
+
 function armarDireccion() {
   const via = document.getElementById('via-direccion');
   const n1 = document.getElementById('dir-n1');
@@ -2203,9 +2224,9 @@ function armarDireccion() {
   const n3 = document.getElementById('dir-n3');
   if (!via || !n1 || !n2 || !n3) return '';
   const a = via.value;
-  const b = soloDigitos(n1.value);
-  const c = soloDigitos(n2.value);
-  const d = soloDigitos(n3.value);
+  const b = parteDireccion(n1.value);
+  const c = parteDireccion(n2.value);
+  const d = parteDireccion(n3.value);
   if (!a || !b || !c || !d) return '';
   return (a + ' ' + b + ' # ' + c + '-' + d).toUpperCase();
 }
@@ -2221,7 +2242,7 @@ function volcarDireccion(texto) {
   const n2 = document.getElementById('dir-n2');
   const n3 = document.getElementById('dir-n3');
   if (!via || !n1 || !n2 || !n3) return;
-  const m = String(texto || '').toUpperCase().match(/^(CALLE|CARRERA|TRANSVERSAL|DIAGONAL|AVENIDA)\s+(\d+)\s+#\s+(\d+)-(\d+)$/);
+  const m = String(texto || '').toUpperCase().match(/^(CALLE|CARRERA|TRANSVERSAL|DIAGONAL|AVENIDA)\s+(.+?)\s+#\s+(.+?)-(.+)$/);
   via.value = m ? m[1] : '';
   n1.value = m ? m[2] : '';
   n2.value = m ? m[3] : '';
@@ -2284,23 +2305,43 @@ function cerrarDireccionGuardada(dir) {
 
 function geolocalizarDireccion(direccion) {
   geoCoords = null;
-  const consulta = String(direccion || '').trim() + ', El Rosal, Cundinamarca, Colombia';
-  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=co&q=' + encodeURIComponent(consulta);
-  return fetch(url, { headers: { 'Accept-Language': 'es' } })
-    .then(res => res.ok ? res.json() : [])
-    .then(lista => {
-      const punto = Array.isArray(lista) ? lista[0] : null;
-      if (!punto) return null;
-      const lat = Number(punto.lat);
-      const lng = Number(punto.lon);
-      const lugar = String(punto.display_name || '');
-      const enRosal = lat > 4.78 && lat < 4.95 && lng > -74.4 && lng < -74.15;
-      const mencionaRosal = /rosal/i.test(lugar);
-      if (!enRosal && !mencionaRosal) return null;
-      geoCoords = { lat: lat, lng: lng, lugar: lugar };
-      return geoCoords;
-    })
-    .catch(() => null);
+  const via = (document.getElementById('via-direccion') || {}).value || '';
+  const n1 = parteDireccion((document.getElementById('dir-n1') || {}).value);
+  const n2 = parteDireccion((document.getElementById('dir-n2') || {}).value);
+  const n3 = parteDireccion((document.getElementById('dir-n3') || {}).value);
+  const nombreVia = v => v.charAt(0) + v.slice(1).toLowerCase();
+  const base1 = (n1.match(/^\d+/) || [''])[0];
+  const viaTxt = via ? nombreVia(via) : '';
+  const intentos = [];
+  const agregar = (q, precision) => { if (q && !intentos.some(x => x.q === q)) intentos.push({ q, precision }); };
+  agregar(String(direccion || '').trim(), 'exacta');
+  if (viaTxt && n1 && n2 && n3) agregar(viaTxt + ' ' + n1 + ' ' + n2 + '-' + n3, 'exacta');
+  if (viaTxt && n1) agregar(viaTxt + ' ' + n1, 'calle');
+  if (viaTxt && base1 && base1 !== n1) agregar(viaTxt + ' ' + base1, 'calle');
+  const caja = '&viewbox=-74.32,4.92,-74.20,4.82&bounded=1';
+  const buscar = (i) => {
+    if (i >= intentos.length) return Promise.resolve(null);
+    const intento = intentos[i];
+    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=co' + caja +
+      '&q=' + encodeURIComponent(intento.q + ', El Rosal, Cundinamarca, Colombia');
+    return fetch(url, { headers: { 'Accept-Language': 'es' } })
+      .then(res => res.ok ? res.json() : [])
+      .catch(() => [])
+      .then(lista => {
+        const punto = Array.isArray(lista) ? lista[0] : null;
+        if (punto) {
+          const lat = Number(punto.lat);
+          const lng = Number(punto.lon);
+          const enRosal = lat > 4.78 && lat < 4.95 && lng > -74.4 && lng < -74.15;
+          if (enRosal) {
+            geoCoords = { lat: lat, lng: lng, lugar: String(punto.display_name || ''), precision: intento.precision };
+            return geoCoords;
+          }
+        }
+        return buscar(i + 1);
+      });
+  };
+  return buscar(0);
 }
 
 function seleccionarTramite(id) {
@@ -3273,7 +3314,7 @@ function confirmarDireccionIngresada() {
   if (competencia) competencia.hidden = true;
   if (fallback) fallback.hidden = true;
   if (!dir) {
-    if (aviso) aviso.textContent = 'Elige la vía y completa los tres números.';
+    if (aviso) aviso.textContent = 'Elige la vía y completa los tres campos. Cada uno debe empezar por un número.';
     return;
   }
   if (aviso) aviso.textContent = '';
@@ -3345,7 +3386,9 @@ function confirmarSinGeolocalizacion() {
     return;
   }
   if (barrio.length < 3) {
-    if (aviso) aviso.textContent = 'Escribe el barrio o la vereda.';
+    if (aviso) aviso.textContent = sector.value === 'RURAL' ? 'Escribe el nombre de la vereda (mínimo 3 letras).' : 'Escribe el nombre del barrio (mínimo 3 letras).';
+    const campo = document.getElementById('campo-barrio');
+    if (campo) { campo.focus(); campo.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return;
   }
   geoCoords = null;
